@@ -1,0 +1,22 @@
+# node modules (frontend + backend)
+node_modules/
+
+# build fájlok
+dist/
+build/
+
+# env fájlok
+.env
+
+# logok
+*.log
+
+# rendszer fájlok
+.DS_Store
+Thumbs.db
+
+# VS Code (opcionális)
+.vscode/
+
+# Vite cache
+.vite/
