@@ -124,8 +124,15 @@ function GamePage({ playerName, selectedTeam }: Props) {
         <div className="goal left-goal"></div>
         <div className="goal right-goal"></div>
 
-        {teamAPlayers.length > 0 && <div className="player player-a"></div>}
-        {teamBPlayers.length > 0 && <div className="player player-b"></div>}
+        <div className="ball"></div>
+
+        <div className="player player-a player-a-1"></div>
+        <div className="player player-a player-a-2"></div>
+        <div className="player player-a player-a-3"></div>
+
+        <div className="player player-b player-b-1"></div>
+        <div className="player player-b player-b-2"></div>
+        <div className="player player-b player-b-3"></div>
       </div>
 
       <div className="button-container">

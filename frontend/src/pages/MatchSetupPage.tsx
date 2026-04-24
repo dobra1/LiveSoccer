@@ -11,7 +11,7 @@ type Props = {
 type Player = {
   id: number;
   name: string;
-  team: string;
+  team: string | null;
   ready: boolean;
 };
 
@@ -23,6 +23,7 @@ function MatchSetupPage({
 }: Props) {
   const navigate = useNavigate();
   const wsRef = useRef<WebSocket | null>(null);
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
 
@@ -31,6 +32,14 @@ function MatchSetupPage({
 
     wsRef.current.onopen = () => {
       console.log("Kapcsolódva a WebSocket szerverhez");
+
+      wsRef.current?.send(
+        JSON.stringify({
+          type: "join",
+          name: playerName,
+          team: null,
+        }),
+      );
     };
 
     wsRef.current.onmessage = (event) => {
@@ -49,6 +58,11 @@ function MatchSetupPage({
       if (data.type === "team_taken") {
         alert(data.message);
       }
+
+      if (data.type === "room_full") {
+        alert(data.message);
+        navigate("/");
+      }
     };
 
     wsRef.current.onclose = () => {
@@ -58,7 +72,7 @@ function MatchSetupPage({
     return () => {
       wsRef.current?.close();
     };
-  }, [navigate]);
+  }, [navigate, playerName]);
 
   const handleSelectTeam = (team: string) => {
     setSelectedTeam(team);
@@ -66,8 +80,7 @@ function MatchSetupPage({
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
-          type: "join",
-          name: playerName,
+          type: "select_team",
           team: team,
         }),
       );
@@ -91,15 +104,24 @@ function MatchSetupPage({
       return;
     }
 
+    const allPlayersHaveTeam = players.every((player) => player.team);
+
+    if (!allPlayersHaveTeam) {
+      alert("Mindkét játékosnak csapatot kell választania.");
+      return;
+    }
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
           type: "ready",
+          ready: true,
         }),
       );
     }
   };
 
+  const waitingPlayers = players.filter((player) => !player.team);
   const teamAPlayers = players.filter((player) => player.team === "A");
   const teamBPlayers = players.filter((player) => player.team === "B");
 
@@ -117,9 +139,20 @@ function MatchSetupPage({
     <div id="match-container">
       <div id="welcome-text">Üdvözöljük a játékban!</div>
       <div id="match-title">⏳ Várakozás a csatlakozásra...</div>
+
       <div id="instruction-text">
         Válassza ki a csapatot, majd mindkét játékos indítsa el a játékot.
       </div>
+
+      {waitingPlayers.length > 0 && (
+        <div className="waiting-players">
+          <p>Csapatválasztásra vár:</p>
+
+          {waitingPlayers.map((player) => (
+            <span key={player.id}>{player.name}</span>
+          ))}
+        </div>
+      )}
 
       <div className="teams-container">
         <div
@@ -141,9 +174,7 @@ function MatchSetupPage({
               handleSelectTeam("A");
             }}
           >
-            {teamAPlayers.length > 0
-              ? teamAPlayers.map((player) => player.name).join(", ")
-              : ""}
+            {teamAPlayers.map((player) => player.name).join(", ")}
           </div>
         </div>
 
@@ -166,9 +197,7 @@ function MatchSetupPage({
               handleSelectTeam("B");
             }}
           >
-            {teamBPlayers.length > 0
-              ? teamBPlayers.map((player) => player.name).join(", ")
-              : ""}
+            {teamBPlayers.map((player) => player.name).join(", ")}
           </div>
         </div>
       </div>
@@ -177,6 +206,7 @@ function MatchSetupPage({
         <button className="start-btn" onClick={handleStartGame}>
           Játék indítása
         </button>
+
         <button className="exit-btn" onClick={handleLeave}>
           Kilépés
         </button>
@@ -184,9 +214,11 @@ function MatchSetupPage({
 
       <div style={{ marginTop: "20px", color: "white" }}>
         {players.length < 2 && <p>Várakozás a másik játékosra...</p>}
+
         {players.length === 2 && !currentPlayer?.ready && (
           <p>Nyomd meg a Játék indítása gombot.</p>
         )}
+
         {players.length === 2 && currentPlayer?.ready && !gameStarted && (
           <p>Várakozás a másik játékosra, hogy elindítsa a játékot...</p>
         )}

@@ -17,6 +17,14 @@ function broadcast(data) {
   });
 }
 
+function sendPlayersUpdate() {
+  broadcast({
+    type: "players_update",
+    players,
+    gameStarted,
+  });
+}
+
 wss.on("connection", (ws) => {
   console.log("Új játékos csatlakozott");
 
@@ -30,13 +38,7 @@ wss.on("connection", (ws) => {
     }),
   );
 
-  ws.send(
-    JSON.stringify({
-      type: "players_update",
-      players: players,
-      gameStarted: gameStarted,
-    }),
-  );
+  sendPlayersUpdate();
 
   ws.on("message", (message) => {
     try {
@@ -44,6 +46,45 @@ wss.on("connection", (ws) => {
       console.log("Kapott adat:", data);
 
       if (data.type === "join") {
+        const existingPlayer = players.find((player) => player.id === ws.id);
+
+        if (!existingPlayer && players.length >= 2) {
+          ws.send(
+            JSON.stringify({
+              type: "room_full",
+              message: "A szoba megtelt.",
+            }),
+          );
+          return;
+        }
+
+        const playerData = {
+          id: ws.id,
+          name: data.name,
+          team: data.team || null,
+          ready: false,
+        };
+
+        if (existingPlayer) {
+          existingPlayer.name = data.name;
+          existingPlayer.team = data.team || existingPlayer.team;
+        } else {
+          players.push(playerData);
+        }
+
+        gameStarted = false;
+        players.forEach((player) => {
+          player.ready = false;
+        });
+
+        sendPlayersUpdate();
+      }
+
+      if (data.type === "select_team") {
+        const currentPlayer = players.find((player) => player.id === ws.id);
+
+        if (!currentPlayer) return;
+
         const takenByOtherPlayer = players.find(
           (player) => player.team === data.team && player.id !== ws.id,
         );
@@ -58,55 +99,28 @@ wss.on("connection", (ws) => {
           return;
         }
 
-        const existingPlayerIndex = players.findIndex(
-          (player) => player.id === ws.id,
-        );
-
-        const playerData = {
-          id: ws.id,
-          name: data.name,
-          team: data.team,
-          ready: false,
-        };
-
-        if (existingPlayerIndex !== -1) {
-          players[existingPlayerIndex] = {
-            ...players[existingPlayerIndex],
-            name: data.name,
-            team: data.team,
-          };
-        } else {
-          players.push(playerData);
-        }
-
+        currentPlayer.team = data.team;
+        currentPlayer.ready = false;
         gameStarted = false;
 
-        broadcast({
-          type: "players_update",
-          players: players,
-          gameStarted: gameStarted,
-        });
+        sendPlayersUpdate();
       }
 
       if (data.type === "ready") {
         const player = players.find((player) => player.id === ws.id);
 
-        if (player) {
-          player.ready = true;
-        }
+        if (!player) return;
+
+        player.ready = data.ready === true;
 
         const bothPlayersReady =
-          players.length === 2 && players.every((player) => player.ready);
+          players.length === 2 &&
+          players.every((player) => player.ready) &&
+          players.every((player) => player.team);
 
-        if (bothPlayersReady) {
-          gameStarted = true;
-        }
+        gameStarted = bothPlayersReady;
 
-        broadcast({
-          type: "players_update",
-          players: players,
-          gameStarted: gameStarted,
-        });
+        sendPlayersUpdate();
       }
     } catch (error) {
       console.error("Hiba az üzenet feldolgozásakor:", error);
@@ -121,17 +135,13 @@ wss.on("connection", (ws) => {
     const disconnectedPlayer = players.find((player) => player.id === ws.id);
 
     players = players.filter((player) => player.id !== ws.id);
-    gameStarted = false;
 
+    gameStarted = false;
     players.forEach((player) => {
       player.ready = false;
     });
 
-    broadcast({
-      type: "players_update",
-      players: players,
-      gameStarted: gameStarted,
-    });
+    sendPlayersUpdate();
 
     if (disconnectedPlayer) {
       broadcast({
