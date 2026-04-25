@@ -2,154 +2,188 @@ const WebSocket = require("ws");
 
 const wss = new WebSocket.Server({ port: 3002 });
 
-let clients = [];
-let players = [];
-let nextId = 1;
-let gameStarted = false;
+let rooms = {};
 
-function broadcast(data) {
-  const message = JSON.stringify(data);
-
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  });
+function generateRoomId() {
+  return Math.random().toString(36).substring(2, 6);
 }
 
-function sendPlayersUpdate() {
-  broadcast({
-    type: "players_update",
-    players,
-    gameStarted,
+function broadcastToRoom(roomId, data) {
+  const message = JSON.stringify(data);
+
+  rooms[roomId]?.players.forEach((player) => {
+    if (player.ws.readyState === WebSocket.OPEN) {
+      player.ws.send(message);
+    }
   });
 }
 
 wss.on("connection", (ws) => {
-  console.log("Új játékos csatlakozott");
+  console.log("Új kliens csatlakozott");
 
-  ws.id = nextId++;
-  clients.push(ws);
-
-  ws.send(
-    JSON.stringify({
-      type: "welcome",
-      message: "Sikeres csatlakozás a szerverhez",
-    }),
-  );
-
-  sendPlayersUpdate();
+  ws.roomId = null;
+  ws.playerName = null;
 
   ws.on("message", (message) => {
-    try {
-      const data = JSON.parse(message.toString());
-      console.log("Kapott adat:", data);
+    const data = JSON.parse(message);
+    console.log("Üzenet:", data);
 
-      if (data.type === "join") {
-        const existingPlayer = players.find((player) => player.id === ws.id);
+    if (data.type === "create_room") {
+      const roomId = generateRoomId();
 
-        if (!existingPlayer && players.length >= 2) {
-          ws.send(
-            JSON.stringify({
-              type: "room_full",
-              message: "A szoba megtelt.",
-            }),
-          );
-          return;
-        }
+      rooms[roomId] = {
+        players: [],
+        gameStarted: false,
+      };
 
-        const playerData = {
-          id: ws.id,
-          name: data.name,
-          team: data.team || null,
-          ready: false,
-        };
+      const player = {
+        name: data.name,
+        team: null,
+        ws,
+      };
 
-        if (existingPlayer) {
-          existingPlayer.name = data.name;
-          existingPlayer.team = data.team || existingPlayer.team;
-        } else {
-          players.push(playerData);
-        }
+      rooms[roomId].players.push(player);
 
-        gameStarted = false;
-        players.forEach((player) => {
-          player.ready = false;
-        });
+      ws.roomId = roomId;
+      ws.playerName = data.name;
 
-        sendPlayersUpdate();
-      }
+      ws.send(
+        JSON.stringify({
+          type: "room_created",
+          roomId,
+        }),
+      );
 
-      if (data.type === "select_team") {
-        const currentPlayer = players.find((player) => player.id === ws.id);
+      broadcastToRoom(roomId, {
+        type: "players_update",
+        players: rooms[roomId].players.map((p) => ({
+          name: p.name,
+          team: p.team,
+        })),
+      });
+    }
 
-        if (!currentPlayer) return;
+    if (data.type === "join_room") {
+      const room = rooms[data.roomId];
 
-        const takenByOtherPlayer = players.find(
-          (player) => player.team === data.team && player.id !== ws.id,
+      if (!room) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Szoba nem létezik",
+          }),
         );
-
-        if (takenByOtherPlayer) {
-          ws.send(
-            JSON.stringify({
-              type: "team_taken",
-              message: `A(z) ${data.team} csapat már foglalt.`,
-            }),
-          );
-          return;
-        }
-
-        currentPlayer.team = data.team;
-        currentPlayer.ready = false;
-        gameStarted = false;
-
-        sendPlayersUpdate();
+        return;
       }
 
-      if (data.type === "ready") {
-        const player = players.find((player) => player.id === ws.id);
+      const player = {
+        name: data.name,
+        team: null,
+        ws,
+      };
 
-        if (!player) return;
+      room.players.push(player);
 
-        player.ready = data.ready === true;
+      ws.roomId = data.roomId;
+      ws.playerName = data.name;
 
-        const bothPlayersReady =
-          players.length === 2 &&
-          players.every((player) => player.ready) &&
-          players.every((player) => player.team);
+      broadcastToRoom(data.roomId, {
+        type: "players_update",
+        players: room.players.map((p) => ({
+          name: p.name,
+          team: p.team,
+        })),
+      });
+    }
 
-        gameStarted = bothPlayersReady;
+    if (data.type === "select_team") {
+      const room = rooms[ws.roomId];
+      if (!room) return;
 
-        sendPlayersUpdate();
+      const player = room.players.find((p) => p.name === ws.playerName);
+
+      if (player) {
+        player.team = data.team;
       }
-    } catch (error) {
-      console.error("Hiba az üzenet feldolgozásakor:", error);
+
+      broadcastToRoom(ws.roomId, {
+        type: "players_update",
+        players: room.players.map((p) => ({
+          name: p.name,
+          team: p.team,
+        })),
+      });
+    }
+
+    if (data.type === "get_room_state") {
+      const room = rooms[ws.roomId];
+      if (!room) return;
+
+      ws.send(
+        JSON.stringify({
+          type: "players_update",
+          players: room.players.map((p) => ({
+            name: p.name,
+            team: p.team,
+          })),
+        }),
+      );
+    }
+
+    if (data.type === "start_game") {
+      const room = rooms[ws.roomId];
+      if (!room) return;
+
+      if (room.players.length < 2) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Legalább 2 játékos kell!",
+          }),
+        );
+        return;
+      }
+
+      const allHaveTeam = room.players.every((p) => p.team);
+
+      if (!allHaveTeam) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "Minden játékosnak csapatot kell választania!",
+          }),
+        );
+        return;
+      }
+
+      room.gameStarted = true;
+
+      broadcastToRoom(ws.roomId, {
+        type: "game_started",
+        players: room.players.map((p) => ({
+          name: p.name,
+          team: p.team,
+        })),
+      });
     }
   });
 
   ws.on("close", () => {
-    console.log("Játékos lecsatlakozott");
+    const room = rooms[ws.roomId];
+    if (!room) return;
 
-    clients = clients.filter((client) => client !== ws);
+    room.players = room.players.filter((p) => p.name !== ws.playerName);
 
-    const disconnectedPlayer = players.find((player) => player.id === ws.id);
-
-    players = players.filter((player) => player.id !== ws.id);
-
-    gameStarted = false;
-    players.forEach((player) => {
-      player.ready = false;
+    broadcastToRoom(ws.roomId, {
+      type: "players_update",
+      players: room.players.map((p) => ({
+        name: p.name,
+        team: p.team,
+      })),
     });
 
-    sendPlayersUpdate();
-
-    if (disconnectedPlayer) {
-      broadcast({
-        type: "player_left",
-        message: `${disconnectedPlayer.name} kilépett a játékból.`,
-      });
-    }
+    console.log("Kliens lecsatlakozott");
   });
 });
 
-console.log("WebSocket szerver fut a 3002-es porton");
+console.log("WebSocket szerver fut: ws://localhost:3002");

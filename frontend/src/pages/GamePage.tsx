@@ -1,83 +1,65 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-type Props = { playerName: string; selectedTeam: string };
+import { getSocket } from "../socket";
 
 type Player = {
-  id: number;
   name: string;
-  team: string;
-  ready: boolean;
+  team: "A" | "B" | null;
 };
 
-function GamePage({ playerName, selectedTeam }: Props) {
+function GamePage() {
   const [time, setTime] = useState(0);
-  const [scoreA, setScoreA] = useState(0);
-  const [scoreB, setScoreB] = useState(0);
+  const [scoreA] = useState(0);
+  const [scoreB] = useState(0);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [gameStarted, setGameStarted] = useState(false);
   const [leftMessage, setLeftMessage] = useState("");
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!playerName || !selectedTeam) return;
+    const ws = getSocket();
 
-    const ws = new WebSocket("ws://localhost:3002");
-
-    ws.onopen = () => {
-      console.log("Kapcsolódva a WebSocket szerverhez");
-
-      ws.send(
-        JSON.stringify({
-          type: "join",
-          name: playerName,
-          team: selectedTeam,
-        }),
-      );
-
-      ws.send(
-        JSON.stringify({
-          type: "ready",
-        }),
-      );
-    };
-
-    ws.onmessage = (event) => {
+    const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Üzenet a szervertől:", data);
+        console.log("GamePage üzenet:", data);
 
         if (data.type === "players_update") {
           setPlayers(data.players);
-          setGameStarted(data.gameStarted);
+        }
+
+        if (data.type === "game_started") {
+          setPlayers(data.players);
         }
 
         if (data.type === "player_left") {
           setLeftMessage(data.message);
         }
-      } catch (error) {
+      } catch {
         console.log("Nem JSON üzenet:", event.data);
       }
     };
 
-    ws.onclose = () => {
-      console.log("Kapcsolat bontva a WebSocket szerverrel");
-    };
+    ws.addEventListener("message", handleMessage);
+
+    ws.send(
+      JSON.stringify({
+        type: "get_room_state",
+      }),
+    );
 
     return () => {
-      ws.close();
+      ws.removeEventListener("message", handleMessage);
     };
-  }, [playerName, selectedTeam]);
+  }, []);
 
   useEffect(() => {
-    if (!gameStarted) return;
-
     const interval = setInterval(() => {
       setTime((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameStarted]);
+  }, []);
 
   const teamAPlayers = players.filter((player) => player.team === "A");
   const teamBPlayers = players.filter((player) => player.team === "B");
@@ -92,53 +74,63 @@ function GamePage({ playerName, selectedTeam }: Props) {
   };
 
   return (
-    <div id="game-container">
-      <div id="scoreboard">
-        <div className="teamA">
-          {teamAPlayers.length > 0
-            ? teamAPlayers.map((player) => player.name).join(", ")
-            : "A csapat"}{" "}
-          {scoreA}
+    <div className="min-h-screen w-full bg-black px-6 py-4 text-white">
+      <div className="mx-auto flex h-full max-w-7xl flex-col items-center">
+        <div className="mb-3 flex w-full max-w-5xl items-center justify-between rounded-lg bg-zinc-900 px-3 py-1.5 shadow">
+          <div className="w-1/3 text-left text-lg font-bold text-red-400">
+            {teamAPlayers.length > 0
+              ? teamAPlayers.map((player) => player.name).join(", ")
+              : "A csapat"}{" "}
+            <span className="text-white px-2">{scoreA}</span>
+          </div>
+
+          <div className="rounded-xl bg-black px-8 text-3xl font-black text-lime-400">
+            {formatTime(time)}
+          </div>
+
+          <div className="w-1/3 text-right text-lg font-bold text-blue-400">
+            {teamBPlayers.length > 0
+              ? teamBPlayers.map((player) => player.name).join(", ")
+              : "B csapat"}{" "}
+            <span className="text-white px-2">{scoreB}</span>
+          </div>
         </div>
 
-        <div className="timer">{formatTime(time)}</div>
+        {leftMessage && (
+          <div className="mb-4 rounded-lg bg-red-500/20 px-6 py-2 text-center text-red-300">
+            {leftMessage}
+          </div>
+        )}
 
-        <div className="teamB">
-          {teamBPlayers.length > 0
-            ? teamBPlayers.map((player) => player.name).join(", ")
-            : "B csapat"}{" "}
-          {scoreB}
+        <div className="relative aspect-[5/3] w-full max-w-5xl overflow-hidden rounded-2xl border-4 border-white bg-green-700 shadow-2xl">
+          <div className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 bg-white" />
+
+          <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white" />
+
+          <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+
+          <div className="absolute left-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-r-4 border-white" />
+          <div className="absolute right-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-l-4 border-white" />
+
+          <div className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg" />
+
+          <div className="absolute left-[25%] top-[25%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
+          <div className="absolute left-[18%] top-[50%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
+          <div className="absolute left-[25%] top-[75%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
+
+          <div className="absolute left-[75%] top-[25%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
+          <div className="absolute left-[82%] top-[50%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
+          <div className="absolute left-[75%] top-[75%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
         </div>
-      </div>
 
-      {/* 👇 IDE KELL */}
-      {leftMessage && (
-        <div style={{ color: "white", textAlign: "center", marginTop: "20px" }}>
-          {leftMessage}
+        <div className="mt-6 flex w-full max-w-5xl justify-end">
+          <button
+            className="rounded-lg bg-red-600 px-6 py-2 font-bold text-white transition hover:bg-red-500"
+            onClick={() => navigate("/")}
+          >
+            Kilépés a játékból
+          </button>
         </div>
-      )}
-
-      <div id="field">
-        <div className="mid-line"></div>
-        <div className="center-circle"></div>
-        <div className="goal left-goal"></div>
-        <div className="goal right-goal"></div>
-
-        <div className="ball"></div>
-
-        <div className="player player-a player-a-1"></div>
-        <div className="player player-a player-a-2"></div>
-        <div className="player player-a player-a-3"></div>
-
-        <div className="player player-b player-b-1"></div>
-        <div className="player player-b player-b-2"></div>
-        <div className="player player-b player-b-3"></div>
-      </div>
-
-      <div className="button-container">
-        <button id="close-btn" onClick={() => navigate("/match-setup")}>
-          Kilépés a játékból
-        </button>
       </div>
     </div>
   );

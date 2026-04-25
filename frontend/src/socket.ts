@@ -1,15 +1,8 @@
-const socket = new WebSocket("ws://localhost:3002");
+let socket: WebSocket | null = null;
 
-socket.onopen = () => {
-  console.log("Kapcsolódva a WebSocket szerverhez");
+export const getSocket = () => {
+  if (!socket) {
+    socket = new WebSocket("ws://localhost:3002");
+  }
+  return socket;
 };
-
-socket.onerror = (error) => {
-  console.error("WebSocket hiba:", error);
-};
-
-socket.onclose = () => {
-  console.log("WebSocket kapcsolat bezárva");
-};
-
-export default socket;
