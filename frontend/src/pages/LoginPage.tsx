@@ -141,11 +141,11 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
     <div className="min-h-screen w-full bg-black text-white">
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="flex w-full max-w-md flex-col items-center">
-          <h1 className="bg-gradient-to-r from-lime-400 to-emerald-500 bg-clip-text text-center text-7xl font-black text-transparent">
-            BALLZONE
+          <h1 className="bg-gradient-to-br from-blue-800 to-emerald-300 bg-clip-text text-center text-7xl font-black text-transparent">
+            Foci Aréna
           </h1>
 
-          <button className="mb-8 mt-6 text-2xl font-bold text-yellow-300 transition hover:scale-105">
+          <button className="mb-8 mt-6 text-2xl font-bold text-lime-300 transition hover:scale-105">
             How to play?
           </button>
 
@@ -156,7 +156,7 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
               placeholder="Player"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 w-full rounded-lg bg-zinc-500/40 px-4 text-white outline-none ring-green-500 placeholder:text-zinc-400 focus:ring"
+              className="h-10 w-full rounded-lg bg-zinc-500/40 px-4 text-white outline-none ring-blue-500 placeholder:text-zinc-400 focus:ring"
             />
           </label>
 
@@ -167,12 +167,12 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
               placeholder="Game id..."
               value={gameId}
               onChange={(e) => setGameId(e.target.value)}
-              className="h-10 w-full rounded-lg bg-zinc-500/40 px-4 text-white outline-none ring-green-500 placeholder:text-zinc-400 focus:ring"
+              className="h-10 w-full rounded-lg bg-zinc-500/40 px-4 text-white outline-none ring-blue-500 placeholder:text-zinc-400 focus:ring"
             />
           </label>
 
           <button
-            className="mb-6 h-10 w-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-500 font-extrabold text-black transition hover:opacity-80 transition delay-150 duration-300 ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-indigo-500"
+            className="mb-6 h-10 w-full rounded-lg bg-gradient-to-br from-blue-800 to-emerald-300 font-extrabold text-black transition hover:opacity-100 transition delay-100 duration-100 ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-indigo-500"
             onClick={handleJoinGame}
           >
             Join game
@@ -185,7 +185,7 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
           </div>
 
           <button
-            className="h-10 w-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-500 font-extrabold text-black transition hover:opacity-80"
+            className="mb-6 h-10 w-full rounded-lg bg-gradient-to-br from-blue-800 to-emerald-300 font-extrabold text-black transition hover:opacity-100 transition delay-100 duration-100 ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-indigo-500"
             onClick={handleCreateGame}
           >
             Create game
@@ -290,7 +290,7 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
               </button>
 
               <button
-                className="rounded-lg bg-gradient-to-r from-lime-500 to-emerald-500 px-8 py-2 font-extrabold text-black transition hover:opacity-80"
+                className="rounded-lg bg-gradient-to-br from-blue-800 to-emerald-300 px-8 py-2 font-extrabold text-black transition hover:opacity-80"
                 onClick={handleStartGame}
               >
                 Start game

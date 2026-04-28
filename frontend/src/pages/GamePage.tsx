@@ -111,8 +111,12 @@ function GamePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const teamAPlayers = players.filter((player) => player.team === "A");
-  const teamBPlayers = players.filter((player) => player.team === "B");
+  const teamAPlayers = players.filter(
+    (player) => player.team === "A" && !player.name.startsWith("A"),
+  );
+  const teamBPlayers = players.filter(
+    (player) => player.team === "B" && !player.name.startsWith("B"),
+  );
 
   const formatTime = (t: number) => {
     const minutes = Math.floor(t / 60);
