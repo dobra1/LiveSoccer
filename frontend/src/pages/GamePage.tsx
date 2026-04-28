@@ -5,13 +5,23 @@ import { getSocket } from "../socket";
 type Player = {
   name: string;
   team: "A" | "B" | null;
+  x: number;
+  y: number;
+};
+
+type Ball = {
+  x: number;
+  y: number;
 };
 
 function GamePage() {
   const [time, setTime] = useState(0);
-  const [scoreA] = useState(0);
-  const [scoreB] = useState(0);
+
+  const [scoreA, setScoreA] = useState(0);
+  const [scoreB, setScoreB] = useState(0);
+
   const [players, setPlayers] = useState<Player[]>([]);
+  const [ball, setBall] = useState<Ball>({ x: 50, y: 50 });
   const [leftMessage, setLeftMessage] = useState("");
 
   const navigate = useNavigate();
@@ -26,10 +36,50 @@ function GamePage() {
 
         if (data.type === "players_update") {
           setPlayers(data.players);
+
+          if (data.ball) {
+            setBall(data.ball);
+          }
+
+          if (typeof data.scoreA === "number") {
+            setScoreA(data.scoreA);
+          }
+
+          if (typeof data.scoreB === "number") {
+            setScoreB(data.scoreB);
+          }
         }
 
         if (data.type === "game_started") {
           setPlayers(data.players);
+
+          if (data.ball) {
+            setBall(data.ball);
+          }
+
+          if (typeof data.scoreA === "number") {
+            setScoreA(data.scoreA);
+          }
+
+          if (typeof data.scoreB === "number") {
+            setScoreB(data.scoreB);
+          }
+        }
+
+        if (data.type === "game_state") {
+          setPlayers(data.players);
+
+          if (data.ball) {
+            setBall(data.ball);
+          }
+
+          if (typeof data.scoreA === "number") {
+            setScoreA(data.scoreA);
+          }
+
+          if (typeof data.scoreB === "number") {
+            setScoreB(data.scoreB);
+          }
         }
 
         if (data.type === "player_left") {
@@ -81,7 +131,7 @@ function GamePage() {
             {teamAPlayers.length > 0
               ? teamAPlayers.map((player) => player.name).join(", ")
               : "A csapat"}{" "}
-            <span className="text-white px-2">{scoreA}</span>
+            <span className="px-2 text-white">{scoreA}</span>
           </div>
 
           <div className="rounded-xl bg-black px-8 text-3xl font-black text-lime-400">
@@ -92,7 +142,7 @@ function GamePage() {
             {teamBPlayers.length > 0
               ? teamBPlayers.map((player) => player.name).join(", ")
               : "B csapat"}{" "}
-            <span className="text-white px-2">{scoreB}</span>
+            <span className="px-2 text-white">{scoreB}</span>
           </div>
         </div>
 
@@ -104,23 +154,31 @@ function GamePage() {
 
         <div className="relative aspect-[5/3] w-full max-w-5xl overflow-hidden rounded-2xl border-4 border-white bg-green-700 shadow-2xl">
           <div className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 bg-white" />
-
           <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white" />
-
           <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
-
           <div className="absolute left-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-r-4 border-white" />
           <div className="absolute right-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-l-4 border-white" />
-
-          <div className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg" />
-
-          <div className="absolute left-[25%] top-[25%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
-          <div className="absolute left-[18%] top-[50%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
-          <div className="absolute left-[25%] top-[75%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-red-500" />
-
-          <div className="absolute left-[75%] top-[25%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
-          <div className="absolute left-[82%] top-[50%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
-          <div className="absolute left-[75%] top-[75%] h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-blue-500" />
+          <div
+            className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg transition-all duration-300"
+            style={{
+              left: `${ball.x}%`,
+              top: `${ball.y}%`,
+            }}
+          />{" "}
+          {players.map((player, index) => (
+            <div
+              key={`${player.name}-${index}`}
+              className={`absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black text-xs font-bold text-white shadow-lg transition-all duration-300 ${
+                player.team === "A" ? "bg-red-500" : "bg-blue-500"
+              }`}
+              style={{
+                left: `${player.x}%`,
+                top: `${player.y}%`,
+              }}
+            >
+              {player.name.charAt(0).toUpperCase()}
+            </div>
+          ))}
         </div>
 
         <div className="mt-6 flex w-full max-w-5xl justify-end">

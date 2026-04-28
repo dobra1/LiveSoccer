@@ -172,7 +172,7 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
           </label>
 
           <button
-            className="mb-6 h-10 w-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-500 font-extrabold text-black transition hover:opacity-80"
+            className="mb-6 h-10 w-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-500 font-extrabold text-black transition hover:opacity-80 transition delay-150 duration-300 ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-indigo-500"
             onClick={handleJoinGame}
           >
             Join game
