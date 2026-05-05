@@ -163,7 +163,7 @@ function GamePage() {
           <div className="absolute left-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-r-4 border-white" />
           <div className="absolute right-0 top-1/2 h-32 w-6 -translate-y-1/2 border-y-4 border-l-4 border-white" />
           <div
-            className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg transition-all duration-300"
+            className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg transition-all duration-75"
             style={{
               left: `${ball.x}%`,
               top: `${ball.y}%`,
@@ -172,7 +172,7 @@ function GamePage() {
           {players.map((player, index) => (
             <div
               key={`${player.name}-${index}`}
-              className={`absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black text-xs font-bold text-white shadow-lg transition-all duration-300 ${
+              className={`absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black text-xs font-bold text-white shadow-lg transition-all duration-100 ${
                 player.team === "A" ? "bg-red-500" : "bg-blue-500"
               }`}
               style={{
