@@ -2,6 +2,8 @@ const WebSocket = require("ws");
 
 let rooms = {};
 
+const MAX_PLAYERS_PER_TEAM = 3;
+
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 6);
 }
@@ -37,6 +39,7 @@ function getPublicPlayers(room) {
     team: p.team,
     x: p.x,
     y: p.y,
+    isBot: p.isBot,
   }));
 }
 
@@ -67,10 +70,10 @@ function broadcastToRoom(roomId, data) {
 
 function getStartPosition(team, index) {
   if (team === "A") {
-    return { x: 20, y: 40 + index * 20 };
+    return { x: 20, y: 25 + index * 16 };
   }
 
-  return { x: 80, y: 40 + index * 20 };
+  return { x: 80, y: 25 + index * 16 };
 }
 
 function distance(a, b) {
@@ -89,6 +92,15 @@ function moveTowards(player, target, speed) {
 
   player.x = clamp(player.x, 5, 95);
   player.y = clamp(player.y, 6, 94);
+}
+
+function getRandomRoamTarget(player) {
+  const isTeamA = player.team === "A";
+
+  return {
+    x: isTeamA ? 20 + Math.random() * 25 : 55 + Math.random() * 25,
+    y: 20 + Math.random() * 60,
+  };
 }
 
 function separatePlayers(players) {
@@ -124,7 +136,7 @@ function separatePlayers(players) {
 
 function separateBallFromPlayers(room) {
   const ball = room.ball;
-  const minDistance = 7;
+  const minDistance = 5;
 
   for (const player of room.players) {
     if (!player.team) continue;
@@ -167,17 +179,20 @@ function updatePlayers(room) {
     teamPlayers.forEach((player, index) => {
       const isClosest = player === closestPlayer;
 
-      if (isClosest) {
-        moveTowards(player, room.ball, 3.8);
+      const ballDistance = distance(player, room.ball);
+
+      if (isClosest || ballDistance < 22) {
+        moveTowards(player, room.ball, 2.8);
       } else {
-        const positionsY = [25, 40, 60, 75];
+        if (
+          !player.roamTarget ||
+          distance(player, player.roamTarget) < 3 ||
+          Math.random() < 0.01
+        ) {
+          player.roamTarget = getRandomRoamTarget(player);
+        }
 
-        const target = {
-          x: player.team === "A" ? 28 + index * 3 : 72 - index * 3,
-          y: positionsY[index] ?? 50,
-        };
-
-        moveTowards(player, target, 0.15);
+        moveTowards(player, player.roamTarget, 0.25);
       }
     });
   });
@@ -219,14 +234,14 @@ function updatePlayers(room) {
     }
 
     if (closestToBall.team === "A" && dx < -0.6) dx = -0.2;
-    if (closestToBall.team === "B" && dx < -0.6) dx = -0.2;
+    if (closestToBall.team === "B" && dx > 0.6) dx = 0.2;
 
     dy += (Math.random() - 0.5) * 0.45;
 
     const finalDist = Math.sqrt(dx * dx + dy * dy);
 
-    room.ball.dx = (dx / finalDist) * 2.4;
-    room.ball.dy = (dy / finalDist) * 2.4;
+    room.ball.dx = (dx / finalDist) * 6.0;
+    room.ball.dy = (dy / finalDist) * 6.0;
 
     room.ball.kickCooldown = 10;
   }
@@ -238,8 +253,8 @@ function updateBall(room) {
   ball.x += ball.dx;
   ball.y += ball.dy;
 
-  ball.dx *= 0.975;
-  ball.dy *= 0.975;
+  ball.dx *= 0.985;
+  ball.dy *= 0.985;
 
   if (Math.abs(ball.dx) < 0.03) ball.dx = 0;
   if (Math.abs(ball.dy) < 0.03) ball.dy = 0;
@@ -276,7 +291,6 @@ function updateBall(room) {
     (ball.x <= 8 || ball.x >= 92) && (ball.y <= 10 || ball.y >= 90);
 
   if (ballInCorner) {
-    // sarokból kifelé lökjük, nem középre
     const pushX = ball.x <= 8 ? 1 : -1;
     const pushY = ball.y <= 10 ? 1 : -1;
 
@@ -316,40 +330,77 @@ function resetAfterGoal(room) {
 }
 
 function addBotPlayers(room) {
-  const teamAPlayers = room.players.filter((p) => p.team === "A");
-  const teamBPlayers = room.players.filter((p) => p.team === "B");
+  ["A", "B"].forEach((team) => {
+    const teamPlayers = room.players.filter((p) => p.team === team);
+    const missingBots = MAX_PLAYERS_PER_TEAM - teamPlayers.length;
 
-  while (teamAPlayers.length < 4) {
-    const index = teamAPlayers.length;
-    const pos = getStartPosition("A", index);
+    for (let i = 0; i < missingBots; i++) {
+      const index = teamPlayers.length + i;
+      const pos = getStartPosition(team, index);
 
-    const bot = {
-      name: `A${index + 1}`,
-      team: "A",
-      x: pos.x,
-      y: pos.y,
-      ws: null,
-    };
+      room.players.push({
+        name: `${team}${index + 1}`,
+        team,
+        x: pos.x,
+        y: pos.y,
+        ws: null,
+        isBot: true,
+      });
+    }
+  });
+}
 
-    teamAPlayers.push(bot);
-    room.players.push(bot);
+function addOrReplacePlayerInTeam(room, ws, team, name) {
+  const teamPlayers = room.players.filter((p) => p.team === team);
+  const botInTeam = teamPlayers.find((p) => p.isBot);
+
+  if (teamPlayers.length >= MAX_PLAYERS_PER_TEAM) {
+    if (botInTeam) {
+      botInTeam.name = name;
+      botInTeam.ws = ws;
+      botInTeam.isBot = false;
+
+      ws.team = team;
+      ws.playerName = name;
+
+      return true;
+    }
+
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "Ez a csapat már tele van.",
+      }),
+    );
+
+    return false;
   }
 
-  while (teamBPlayers.length < 4) {
-    const index = teamBPlayers.length;
-    const pos = getStartPosition("B", index);
+  const pos = getStartPosition(team, teamPlayers.length);
 
-    const bot = {
-      name: `B${index + 1}`,
-      team: "B",
+  const player = room.players.find((p) => p.ws === ws);
+
+  if (player) {
+    player.name = name;
+    player.team = team;
+    player.x = pos.x;
+    player.y = pos.y;
+    player.isBot = false;
+  } else {
+    room.players.push({
+      name,
+      team,
       x: pos.x,
       y: pos.y,
-      ws: null,
-    };
-
-    teamBPlayers.push(bot);
-    room.players.push(bot);
+      ws,
+      isBot: false,
+    });
   }
+
+  ws.team = team;
+  ws.playerName = name;
+
+  return true;
 }
 
 function startGameLoop(roomId) {
@@ -373,6 +424,7 @@ function handleConnection(ws) {
 
   ws.roomId = null;
   ws.playerName = null;
+  ws.team = null;
 
   ws.on("message", (message) => {
     const data = JSON.parse(message);
@@ -389,6 +441,7 @@ function handleConnection(ws) {
         x: 50,
         y: 50,
         ws,
+        isBot: false,
       };
 
       rooms[roomId].players.push(player);
@@ -416,24 +469,27 @@ function handleConnection(ws) {
         ws.send(
           JSON.stringify({
             type: "error",
-            message: "Szoba nem létezik",
+            message: "A szoba nem létezik",
           }),
         );
         return;
       }
 
-      const player = {
-        name: data.name,
-        team: null,
-        x: 50,
-        y: 50,
-        ws,
-      };
-
-      room.players.push(player);
-
       ws.roomId = data.roomId;
       ws.playerName = data.name;
+
+      const existingPlayer = room.players.find((p) => p.ws === ws);
+
+      if (!existingPlayer) {
+        room.players.push({
+          name: data.name,
+          team: null,
+          x: 50,
+          y: 50,
+          ws,
+          isBot: false,
+        });
+      }
 
       broadcastToRoom(data.roomId, {
         type: "players_update",
@@ -445,11 +501,24 @@ function handleConnection(ws) {
       const room = rooms[ws.roomId];
       if (!room) return;
 
-      const player = room.players.find((p) => p.name === ws.playerName);
+      const oldPlayer = room.players.find((p) => p.ws === ws);
 
-      if (player) {
-        player.team = data.team;
+      if (oldPlayer && oldPlayer.team === data.team) {
+        return;
       }
+
+      if (oldPlayer && oldPlayer.team !== data.team) {
+        room.players = room.players.filter((p) => p.ws !== ws);
+      }
+
+      const success = addOrReplacePlayerInTeam(
+        room,
+        ws,
+        data.team,
+        ws.playerName || data.name,
+      );
+
+      if (!success) return;
 
       broadcastToRoom(ws.roomId, {
         type: "players_update",
@@ -472,6 +541,16 @@ function handleConnection(ws) {
     if (data.type === "start_game") {
       const room = rooms[ws.roomId];
       if (!room) return;
+
+      if (room.gameStarted) {
+        ws.send(
+          JSON.stringify({
+            type: "game_started",
+            ...getGameState(room),
+          }),
+        );
+        return;
+      }
 
       const humanPlayers = room.players.filter((p) => p.ws);
 
@@ -497,10 +576,11 @@ function handleConnection(ws) {
         return;
       }
 
+      addBotPlayers(room);
+
       room.gameStarted = true;
       room.ball = createBall();
 
-      addBotPlayers(room);
       resetAfterGoal(room);
 
       broadcastToRoom(ws.roomId, {

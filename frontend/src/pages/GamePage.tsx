@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSocket } from "../socket";
 
@@ -16,13 +16,14 @@ type Ball = {
 
 function GamePage() {
   const [time, setTime] = useState(0);
-
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
-
   const [players, setPlayers] = useState<Player[]>([]);
   const [ball, setBall] = useState<Ball>({ x: 50, y: 50 });
   const [leftMessage, setLeftMessage] = useState("");
+  const [goalMessage, setGoalMessage] = useState("");
+  const scoreARef = useRef(0);
+  const scoreBRef = useRef(0);
 
   const navigate = useNavigate();
 
@@ -34,7 +35,11 @@ function GamePage() {
         const data = JSON.parse(event.data);
         console.log("GamePage üzenet:", data);
 
-        if (data.type === "players_update") {
+        if (
+          data.type === "players_update" ||
+          data.type === "game_started" ||
+          data.type === "game_state"
+        ) {
           setPlayers(data.players);
 
           if (data.ball) {
@@ -42,46 +47,31 @@ function GamePage() {
           }
 
           if (typeof data.scoreA === "number") {
+            if (data.scoreA > scoreARef.current) {
+              setGoalMessage("GOOOL! Piros csapat gólt szerzett!");
+
+              setTimeout(() => {
+                setGoalMessage("");
+              }, 3000);
+            }
+
+            scoreARef.current = data.scoreA;
             setScoreA(data.scoreA);
           }
 
           if (typeof data.scoreB === "number") {
+            if (data.scoreB > scoreBRef.current) {
+              setGoalMessage("GOOOL! Kék csapat gólt szerzett!");
+
+              setTimeout(() => {
+                setGoalMessage("");
+              }, 3000);
+            }
+
+            scoreBRef.current = data.scoreB;
             setScoreB(data.scoreB);
           }
         }
-
-        if (data.type === "game_started") {
-          setPlayers(data.players);
-
-          if (data.ball) {
-            setBall(data.ball);
-          }
-
-          if (typeof data.scoreA === "number") {
-            setScoreA(data.scoreA);
-          }
-
-          if (typeof data.scoreB === "number") {
-            setScoreB(data.scoreB);
-          }
-        }
-
-        if (data.type === "game_state") {
-          setPlayers(data.players);
-
-          if (data.ball) {
-            setBall(data.ball);
-          }
-
-          if (typeof data.scoreA === "number") {
-            setScoreA(data.scoreA);
-          }
-
-          if (typeof data.scoreB === "number") {
-            setScoreB(data.scoreB);
-          }
-        }
-
         if (data.type === "player_left") {
           setLeftMessage(data.message);
         }
@@ -112,10 +102,11 @@ function GamePage() {
   }, []);
 
   const teamAPlayers = players.filter(
-    (player) => player.team === "A" && !player.name.startsWith("A"),
+    (player) => player.team === "A" && !/^A\d+$/.test(player.name),
   );
+
   const teamBPlayers = players.filter(
-    (player) => player.team === "B" && !player.name.startsWith("B"),
+    (player) => player.team === "B" && !/^B\d+$/.test(player.name),
   );
 
   const formatTime = (t: number) => {
@@ -132,9 +123,7 @@ function GamePage() {
       <div className="mx-auto flex h-full max-w-7xl flex-col items-center">
         <div className="mb-3 flex w-full max-w-5xl items-center justify-between rounded-lg bg-zinc-900 px-3 py-1.5 shadow">
           <div className="w-1/3 text-left text-lg font-bold text-red-400">
-            {teamAPlayers.length > 0
-              ? teamAPlayers.map((player) => player.name).join(", ")
-              : "A csapat"}{" "}
+            {teamAPlayers.map((player) => player.name).join(", ")}
             <span className="px-2 text-white">{scoreA}</span>
           </div>
 
@@ -143,12 +132,16 @@ function GamePage() {
           </div>
 
           <div className="w-1/3 text-right text-lg font-bold text-blue-400">
-            {teamBPlayers.length > 0
-              ? teamBPlayers.map((player) => player.name).join(", ")
-              : "B csapat"}{" "}
+            {teamBPlayers.map((player) => player.name).join(", ")}
             <span className="px-2 text-white">{scoreB}</span>
           </div>
         </div>
+
+        {goalMessage && (
+          <div className="mb-4 rounded-xl bg-yellow-400 px-8 py-1 text-md font-black text-black shadow-lg">
+            {goalMessage}
+          </div>
+        )}
 
         {leftMessage && (
           <div className="mb-4 rounded-lg bg-red-500/20 px-6 py-2 text-center text-red-300">
@@ -172,7 +165,7 @@ function GamePage() {
           {players.map((player, index) => (
             <div
               key={`${player.name}-${index}`}
-              className={`absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black text-xs font-bold text-white shadow-lg transition-all duration-100 ${
+              className={`absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black text-xs font-bold text-white shadow-lg transition-all duration-100 ${
                 player.team === "A" ? "bg-red-500" : "bg-blue-500"
               }`}
               style={{
@@ -180,7 +173,8 @@ function GamePage() {
                 top: `${player.y}%`,
               }}
             >
-              {player.name.charAt(0).toUpperCase()}
+              {player.name.charAt(0).toUpperCase() +
+                player.name.slice(1).toLocaleLowerCase()}
             </div>
           ))}
         </div>

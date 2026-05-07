@@ -227,10 +227,10 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
             <div className="grid grid-cols-3 gap-6">
               <div
                 onClick={() => selectTeam("A")}
-                className="flex min-h-80 cursor-pointer flex-col items-center rounded-2xl border border-zinc-700 bg-zinc-800 p-6 transition hover:scale-105 hover:border-lime-400"
+                className="flex min-h-80 cursor-pointer flex-col items-center rounded-2xl border border-zinc-700 bg-zinc-800 p-6 transition hover:scale-105 hover:border-red-400"
               >
-                <h3 className="mb-6 text-2xl font-bold text-lime-400">
-                  Left Team
+                <h3 className="mb-6 text-2xl font-bold text-red-400">
+                  Piros csapat
                 </h3>
 
                 <div className="flex w-full flex-col gap-3">
@@ -262,10 +262,10 @@ function LoginPage({ setPlayerName, setSelectedTeam }: Props) {
 
               <div
                 onClick={() => selectTeam("B")}
-                className="flex min-h-80 cursor-pointer flex-col items-center rounded-2xl border border-zinc-700 bg-zinc-800 p-6 transition hover:scale-105 hover:border-emerald-400"
+                className="flex min-h-80 cursor-pointer flex-col items-center rounded-2xl border border-zinc-700 bg-zinc-800 p-6 transition hover:scale-105 hover:border-blue-400"
               >
-                <h3 className="mb-6 text-2xl font-bold text-emerald-400">
-                  Right Team
+                <h3 className="mb-6 text-2xl font-bold text-blue-400">
+                  Kék csapat
                 </h3>
 
                 <div className="flex w-full flex-col gap-3">
